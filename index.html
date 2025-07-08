@@ -22,30 +22,45 @@
       background: new Image(),
       player1: new Image(),
       player2: new Image(),
-      ball: new Image()
+      ball: new Image(),
+      goalLeft: new Image(),
+      goalRight: new Image()
     };
 
     images.background.src = "assets/background.png";
     images.player1.src = "assets/player1.png";
     images.player2.src = "assets/player2.png";
     images.ball.src = "assets/ball.png";
+    images.goalLeft.src = "assets/goal-left.png";
+    images.goalRight.src = "assets/goal-right.png";
 
     const GRAVITY = 0.5;
     const FLOOR_Y = 336;
 
     const player1 = { x: 100, y: FLOOR_Y, w: 64, h: 64, name: "Big G", vx: 0, vy: 0, jumping: false };
     const player2 = { x: 600, y: FLOOR_Y, w: 64, h: 64, name: "Donny", vx: 0, vy: 0, jumping: false };
-    const ball = { x: 400, y: 300, vx: 3, vy: -2, radius: 20 };
+    const ball = { x: 400, y: 300, vx: 3, vy: -2, radius: 20, hitCooldown: 0 };
+
+    let score = { player1: 0, player2: 0 };
+    let countdown = 0;
+    let countdownText = "";
 
     const keys = {};
     window.addEventListener("keydown", e => keys[e.key] = true);
     window.addEventListener("keyup", e => keys[e.key] = false);
 
+    function resetBall() {
+      ball.x = 400;
+      ball.y = 300;
+      ball.vx = Math.random() < 0.5 ? 3 : -3;
+      ball.vy = -2;
+      countdown = 180; // 3 seconds at 60fps
+    }
+
     function updatePlayer(player, leftKey, rightKey, jumpKey) {
       if (keys[leftKey]) player.x -= 5;
       if (keys[rightKey]) player.x += 5;
 
-      // Jump
       if (keys[jumpKey] && !player.jumping) {
         player.vy = -10;
         player.jumping = true;
@@ -54,58 +69,118 @@
       player.y += player.vy;
       player.vy += GRAVITY;
 
-      // Floor collision
       if (player.y >= FLOOR_Y) {
         player.y = FLOOR_Y;
         player.vy = 0;
         player.jumping = false;
       }
+
+      // Prevent off-screen
+      if (player.x < 0) player.x = 0;
+      if (player.x + player.w > canvas.width) player.x = canvas.width - player.w;
     }
 
     function checkBallCollision(player) {
-      const distX = Math.abs(ball.x - (player.x + player.w / 2));
-      const distY = Math.abs(ball.y - (player.y + player.h / 2));
+      const dx = ball.x - (player.x + player.w / 2);
+      const dy = ball.y - (player.y + player.h / 2);
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distX <= player.w / 2 + ball.radius && distY <= player.h / 2 + ball.radius) {
-        ball.vx *= -1;
-        ball.vy = -5;
+      if (distance < ball.radius + player.w / 2 && ball.hitCooldown <= 0) {
+        const angle = Math.atan2(dy, dx);
+        const speed = 6;
+        ball.vx = Math.cos(angle) * speed;
+        ball.vy = Math.sin(angle) * speed;
+        ball.hitCooldown = 10;
+      }
+    }
+
+    function checkGoal() {
+      const goalHeight = 120;
+      const goalTop = (canvas.height - goalHeight) / 2;
+
+      // Left goal
+      if (ball.x - ball.radius <= 20 && ball.y > goalTop && ball.y < goalTop + goalHeight) {
+        score.player2++;
+        resetBall();
+      }
+
+      // Right goal
+      if (ball.x + ball.radius >= canvas.width - 20 && ball.y > goalTop && ball.y < goalTop + goalHeight) {
+        score.player1++;
+        resetBall();
       }
     }
 
     function update() {
+      if (countdown > 0) {
+        countdown--;
+        if (countdown > 120) countdownText = "3";
+        else if (countdown > 60) countdownText = "2";
+        else if (countdown > 0) countdownText = "1";
+        else countdownText = "PLAY!";
+        return;
+      } else {
+        countdownText = "";
+      }
+
       updatePlayer(player1, "a", "d", "w");
       updatePlayer(player2, "ArrowLeft", "ArrowRight", "ArrowUp");
 
-      // Ball movement
+      if (ball.hitCooldown > 0) ball.hitCooldown--;
+
       ball.x += ball.vx;
       ball.y += ball.vy;
       ball.vy += GRAVITY;
 
-      // Ball bounds
+      // Ball boundaries
+      if (ball.x - ball.radius < 0) {
+        ball.x = ball.radius;
+        ball.vx *= -1;
+      }
+      if (ball.x + ball.radius > canvas.width) {
+        ball.x = canvas.width - ball.radius;
+        ball.vx *= -1;
+      }
       if (ball.y + ball.radius >= canvas.height) {
         ball.y = canvas.height - ball.radius;
         ball.vy *= -0.8;
       }
       if (ball.y <= 0) ball.vy *= -1;
-      if (ball.x <= 0 || ball.x >= canvas.width) ball.vx *= -1;
 
-      // Collision with players
       checkBallCollision(player1);
       checkBallCollision(player2);
+      checkGoal();
     }
 
     function draw() {
       ctx.drawImage(images.background, 0, 0, canvas.width, canvas.height);
 
+      // Draw goals
+      ctx.drawImage(images.goalLeft, 0, 140, 60, 120);
+      ctx.drawImage(images.goalRight, canvas.width - 60, 140, 60, 120);
+
+      // Draw players and ball
+      ctx.drawImage(images.player1, player1.x, player1.y, player1.w, player1.h);
+      ctx.drawImage(images.player2, player2.x, player2.y, player2.w, player2.h);
+      ctx.drawImage(images.ball, ball.x - ball.radius, ball.y - ball.radius, 40, 40);
+
+      // Names
       ctx.font = "16px Arial";
       ctx.fillStyle = "#000";
       ctx.textAlign = "center";
       ctx.fillText(player1.name, player1.x + player1.w / 2, player1.y - 10);
       ctx.fillText(player2.name, player2.x + player2.w / 2, player2.y - 10);
 
-      ctx.drawImage(images.player1, player1.x, player1.y, player1.w, player1.h);
-      ctx.drawImage(images.player2, player2.x, player2.y, player2.w, player2.h);
-      ctx.drawImage(images.ball, ball.x - ball.radius, ball.y - ball.radius, 40, 40);
+      // Score
+      ctx.font = "24px Arial";
+      ctx.fillText(score.player1 + " : " + score.player2, canvas.width / 2, 30);
+
+      // Countdown
+      if (countdownText) {
+        ctx.font = "48px Arial";
+        ctx.fillStyle = "red";
+        ctx.fillText(countdownText, canvas.width / 2, canvas.height / 2);
+      }
     }
 
     function loop() {
@@ -119,7 +194,10 @@
     Object.values(images).forEach(img => {
       img.onload = () => {
         loaded++;
-        if (loaded === total) loop();
+        if (loaded === total) {
+          resetBall();
+          loop();
+        }
       };
     });
   </script>
