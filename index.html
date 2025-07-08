@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,40 +18,84 @@
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
 
-    const bgImg = new Image();
-    const playerImg1 = new Image();
-    const playerImg2 = new Image();
-    const ballImg = new Image();
+    const images = {
+      background: new Image(),
+      player1: new Image(),
+      player2: new Image(),
+      ball: new Image()
+    };
 
-    bgImg.src = "assets/background.png";
-    playerImg1.src = "assets/player1.png";
-    playerImg2.src = "assets/player2.png";
-    ballImg.src = "assets/ball.png";
+    images.background.src = "assets/background.png";
+    images.player1.src = "assets/player1.png";
+    images.player2.src = "assets/player2.png";
+    images.ball.src = "assets/ball.png";
 
-    const player1 = { x: 100, y: 300, w: 64, h: 64, name: "Big G" };
-    const player2 = { x: 600, y: 300, w: 64, h: 64, name: "Donny" };
+    const GRAVITY = 0.5;
+    const FLOOR_Y = 336;
+
+    const player1 = { x: 100, y: FLOOR_Y, w: 64, h: 64, name: "Big G", vx: 0, vy: 0, jumping: false };
+    const player2 = { x: 600, y: FLOOR_Y, w: 64, h: 64, name: "Donny", vx: 0, vy: 0, jumping: false };
     const ball = { x: 400, y: 300, vx: 3, vy: -2, radius: 20 };
 
-    let keys = {};
+    const keys = {};
     window.addEventListener("keydown", e => keys[e.key] = true);
     window.addEventListener("keyup", e => keys[e.key] = false);
 
-    function update() {
-      // Player movement
-      if (keys["a"]) player1.x -= 5;
-      if (keys["d"]) player1.x += 5;
-      if (keys["ArrowLeft"]) player2.x -= 5;
-      if (keys["ArrowRight"]) player2.x += 5;
+    function updatePlayer(player, leftKey, rightKey, jumpKey) {
+      if (keys[leftKey]) player.x -= 5;
+      if (keys[rightKey]) player.x += 5;
 
-      // Ball physics
+      // Jump
+      if (keys[jumpKey] && !player.jumping) {
+        player.vy = -10;
+        player.jumping = true;
+      }
+
+      player.y += player.vy;
+      player.vy += GRAVITY;
+
+      // Floor collision
+      if (player.y >= FLOOR_Y) {
+        player.y = FLOOR_Y;
+        player.vy = 0;
+        player.jumping = false;
+      }
+    }
+
+    function checkBallCollision(player) {
+      const distX = Math.abs(ball.x - (player.x + player.w / 2));
+      const distY = Math.abs(ball.y - (player.y + player.h / 2));
+
+      if (distX <= player.w / 2 + ball.radius && distY <= player.h / 2 + ball.radius) {
+        ball.vx *= -1;
+        ball.vy = -5;
+      }
+    }
+
+    function update() {
+      updatePlayer(player1, "a", "d", "w");
+      updatePlayer(player2, "ArrowLeft", "ArrowRight", "ArrowUp");
+
+      // Ball movement
       ball.x += ball.vx;
       ball.y += ball.vy;
-      if (ball.y <= 0 || ball.y >= canvas.height) ball.vy *= -1;
+      ball.vy += GRAVITY;
+
+      // Ball bounds
+      if (ball.y + ball.radius >= canvas.height) {
+        ball.y = canvas.height - ball.radius;
+        ball.vy *= -0.8;
+      }
+      if (ball.y <= 0) ball.vy *= -1;
       if (ball.x <= 0 || ball.x >= canvas.width) ball.vx *= -1;
+
+      // Collision with players
+      checkBallCollision(player1);
+      checkBallCollision(player2);
     }
 
     function draw() {
-      ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(images.background, 0, 0, canvas.width, canvas.height);
 
       ctx.font = "16px Arial";
       ctx.fillStyle = "#000";
@@ -58,9 +103,9 @@
       ctx.fillText(player1.name, player1.x + player1.w / 2, player1.y - 10);
       ctx.fillText(player2.name, player2.x + player2.w / 2, player2.y - 10);
 
-      ctx.drawImage(playerImg1, player1.x, player1.y, player1.w, player1.h);
-      ctx.drawImage(playerImg2, player2.x, player2.y, player2.w, player2.h);
-      ctx.drawImage(ballImg, ball.x - ball.radius, ball.y - ball.radius, 40, 40);
+      ctx.drawImage(images.player1, player1.x, player1.y, player1.w, player1.h);
+      ctx.drawImage(images.player2, player2.x, player2.y, player2.w, player2.h);
+      ctx.drawImage(images.ball, ball.x - ball.radius, ball.y - ball.radius, 40, 40);
     }
 
     function loop() {
@@ -69,12 +114,12 @@
       requestAnimationFrame(loop);
     }
 
-    // Wait until all images are loaded
     let loaded = 0;
-    [bgImg, playerImg1, playerImg2, ballImg].forEach(img => {
+    const total = Object.keys(images).length;
+    Object.values(images).forEach(img => {
       img.onload = () => {
         loaded++;
-        if (loaded === 4) loop(); // start only after everything loads
+        if (loaded === total) loop();
       };
     });
   </script>
