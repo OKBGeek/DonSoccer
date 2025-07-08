@@ -10,21 +10,28 @@
       margin: 0 auto;
       border: 2px solid #333;
     }
-    #restartBtn {
-      display: block;
-      margin: 10px auto;
+    #controls {
+      text-align: center;
+      margin-top: 10px;
+    }
+    button {
       padding: 8px 16px;
+      margin: 4px;
       font-size: 16px;
     }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas" width="800" height="400"></canvas>
-  <button id="restartBtn">Restart Game</button>
+  <div id="controls">
+    <button onclick="startMatch(60)">1 Minute</button>
+    <button onclick="startMatch(120)">2 Minutes</button>
+    <button onclick="startMatch(180)">3 Minutes</button>
+    <button onclick="resetGame()">Restart Game</button>
+  </div>
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-    const restartBtn = document.getElementById("restartBtn");
 
     const images = {
       background: new Image(),
@@ -48,13 +55,16 @@
     const BOUNCE = 0.9;
     const BALL_STOP_THRESHOLD = 0.15;
 
-    const player1 = { x: 100, y: FLOOR_Y, w: 64, h: 64, name: "Big G", vx: 0, vy: 0, jumping: false };
-    const player2 = { x: 600, y: FLOOR_Y, w: 64, h: 64, name: "Donny", vx: 0, vy: 0, jumping: false };
-    const ball = { x: 400, y: 300, vx: 0, vy: -5, radius: 20, hitCooldown: 0, heldBy: null };
+    const player1 = { x: 100, y: FLOOR_Y, w: 64, h: 64, name: "Big G", vy: 0, jumping: false };
+    const player2 = { x: 600, y: FLOOR_Y, w: 64, h: 64, name: "Donny", vy: 0, jumping: false };
+    const ball = { x: 400, y: 300, vx: 0, vy: -7, radius: 20, hitCooldown: 0, heldBy: null };
 
     let score = { player1: 0, player2: 0 };
     let countdown = 0;
     let countdownText = "";
+    let matchTime = 0;
+    let matchRunning = false;
+    let winnerText = "";
 
     const keys = {};
     window.addEventListener("keydown", e => keys[e.key] = true);
@@ -63,15 +73,18 @@
       if (ball.heldBy && (e.key === "s" || e.key === "ArrowDown")) {
         ball.heldBy = null;
         ball.vx = 0;
-        ball.vy = -5;
+        ball.vy = -7;
       }
     });
 
-    restartBtn.addEventListener("click", () => {
+    function startMatch(seconds) {
+      matchTime = seconds * 60;
       score.player1 = 0;
       score.player2 = 0;
+      winnerText = "";
       resetGame();
-    });
+      matchRunning = true;
+    }
 
     function resetPlayers() {
       player1.x = 100;
@@ -89,7 +102,7 @@
       ball.x = 400;
       ball.y = 300;
       ball.vx = 0;
-      ball.vy = -5;
+      ball.vy = -7;
       ball.heldBy = null;
       countdown = 180;
     }
@@ -102,7 +115,6 @@
     function updatePlayer(player, leftKey, rightKey, jumpKey, downKey, id) {
       if (keys[leftKey]) player.x -= 5;
       if (keys[rightKey]) player.x += 5;
-
       if (keys[jumpKey] && !player.jumping) {
         player.vy = -10;
         player.jumping = true;
@@ -132,6 +144,7 @@
 
     function checkBallCollision(player) {
       if (ball.heldBy) return;
+
       const px = player.x;
       const py = player.y;
       const pw = player.w;
@@ -141,16 +154,15 @@
       const closestY = Math.max(py, Math.min(ball.y, py + ph));
       const dx = ball.x - closestX;
       const dy = ball.y - closestY;
-
       const distance = Math.sqrt(dx * dx + dy * dy);
+
       if (distance < ball.radius && ball.hitCooldown <= 0) {
-        if (Math.abs(dy) > Math.abs(dx)) {
-          // vertical collision
-          ball.vy = -Math.abs(ball.vy || 2);
-        } else {
-          // horizontal collision
-          ball.vx = dx > 0 ? Math.abs(ball.vx || 2) : -Math.abs(ball.vx || 2);
-        }
+        const overlap = ball.radius - distance + 1;
+        const angle = Math.atan2(dy, dx);
+        ball.vx += Math.cos(angle) * 3;
+        ball.vy += Math.sin(angle) * 3;
+        ball.x += Math.cos(angle) * overlap;
+        ball.y += Math.sin(angle) * overlap;
         ball.hitCooldown = 10;
       }
     }
@@ -170,6 +182,8 @@
     }
 
     function update() {
+      if (!matchRunning) return;
+
       if (countdown > 0) {
         countdown--;
         if (countdown > 120) countdownText = "3";
@@ -179,6 +193,20 @@
         return;
       } else {
         countdownText = "";
+      }
+
+      if (matchTime > 0) {
+        matchTime--;
+        if (matchTime === 0) {
+          matchRunning = false;
+          if (score.player1 > score.player2) {
+            winnerText = "Big G WINS!";
+          } else if (score.player2 > score.player1) {
+            winnerText = "Donny WINS!";
+          } else {
+            winnerText = "IT'S A DRAW!";
+          }
+        }
       }
 
       updatePlayer(player1, "a", "d", "w", "s", "player1");
@@ -203,7 +231,6 @@
       ball.vx *= FRICTION;
       ball.vy *= FRICTION;
 
-      // Stop if very slow
       if (Math.abs(ball.vx) < BALL_STOP_THRESHOLD) ball.vx = 0;
       if (Math.abs(ball.vy) < BALL_STOP_THRESHOLD) ball.vy = 0;
 
@@ -217,7 +244,7 @@
       }
       if (ball.y + ball.radius >= canvas.height) {
         ball.y = canvas.height - ball.radius;
-        ball.vy *= -BOUNCE;
+        ball.vy = 0;
       }
       if (ball.y <= 0) ball.vy *= -1;
 
@@ -248,6 +275,18 @@
         ctx.font = "48px Arial";
         ctx.fillStyle = "red";
         ctx.fillText(countdownText, canvas.width / 2, canvas.height / 2);
+      }
+
+      if (matchTime > 0 && matchRunning) {
+        ctx.font = "20px Arial";
+        ctx.fillStyle = "black";
+        ctx.fillText("Time Left: " + Math.floor(matchTime / 60), canvas.width / 2, 60);
+      }
+
+      if (winnerText) {
+        ctx.font = "48px Arial";
+        ctx.fillStyle = "green";
+        ctx.fillText(winnerText, canvas.width / 2, canvas.height / 2 + 40);
       }
     }
 
