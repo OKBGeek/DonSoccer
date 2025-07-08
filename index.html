@@ -199,7 +199,44 @@
       }
     }
 
-    function checkGoal() {
+    
+function checkGoal() {
+  const goalTopY = canvas.height - 120;
+  const goalHeight = 120;
+  const goalWidth = 60;
+
+  // Left goal top/crossbar bounce
+  if (
+    ball.x - ball.radius <= goalWidth &&
+    ball.y + ball.radius >= goalTopY &&
+    ball.y - ball.radius <= goalTopY + 10 // Allow bounce on crossbar
+  ) {
+    if (ball.y - ball.radius <= goalTopY + 10) {
+      ball.vy *= -BOUNCE_REDUCTION;
+      return;
+    }
+    if (ball.y >= goalTopY + 10) {
+      score.player2++;
+      resetGame();
+    }
+  }
+
+  // Right goal top/crossbar bounce
+  if (
+    ball.x + ball.radius >= canvas.width - goalWidth &&
+    ball.y + ball.radius >= goalTopY &&
+    ball.y - ball.radius <= goalTopY + 10
+  ) {
+    if (ball.y - ball.radius <= goalTopY + 10) {
+      ball.vy *= -BOUNCE_REDUCTION;
+      return;
+    }
+    if (ball.y >= goalTopY + 10) {
+      score.player1++;
+      resetGame();
+    }
+  }
+
       const goalTopY = canvas.height - 120;
 
       if (ball.y + ball.radius < goalTopY) return;
