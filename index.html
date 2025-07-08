@@ -10,13 +10,21 @@
       margin: 0 auto;
       border: 2px solid #333;
     }
+    #restartBtn {
+      display: block;
+      margin: 10px auto;
+      padding: 8px 16px;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <button id="restartBtn">Restart Game</button>
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
+    const restartBtn = document.getElementById("restartBtn");
 
     const images = {
       background: new Image(),
@@ -34,14 +42,15 @@
     images.goalLeft.src = "assets/goal-left.png";
     images.goalRight.src = "assets/goal-right.png";
 
-    const GRAVITY = 0.5 * 0.85;
+    const GRAVITY = 0.425;
     const FLOOR_Y = 336;
-    const FRICTION = 0.985;
+    const FRICTION = 0.98;
     const BOUNCE = 0.9;
+    const BALL_STOP_THRESHOLD = 0.15;
 
     const player1 = { x: 100, y: FLOOR_Y, w: 64, h: 64, name: "Big G", vx: 0, vy: 0, jumping: false };
     const player2 = { x: 600, y: FLOOR_Y, w: 64, h: 64, name: "Donny", vx: 0, vy: 0, jumping: false };
-    const ball = { x: 400, y: 300, vx: 2.5, vy: -1.5, radius: 20, hitCooldown: 0, heldBy: null };
+    const ball = { x: 400, y: 300, vx: 0, vy: -5, radius: 20, hitCooldown: 0, heldBy: null };
 
     let score = { player1: 0, player2: 0 };
     let countdown = 0;
@@ -53,18 +62,41 @@
       keys[e.key] = false;
       if (ball.heldBy && (e.key === "s" || e.key === "ArrowDown")) {
         ball.heldBy = null;
-        ball.vx = Math.random() < 0.5 ? 3 : -3;
-        ball.vy = -3;
+        ball.vx = 0;
+        ball.vy = -5;
       }
     });
+
+    restartBtn.addEventListener("click", () => {
+      score.player1 = 0;
+      score.player2 = 0;
+      resetGame();
+    });
+
+    function resetPlayers() {
+      player1.x = 100;
+      player1.y = FLOOR_Y;
+      player1.vy = 0;
+      player1.jumping = false;
+
+      player2.x = 600;
+      player2.y = FLOOR_Y;
+      player2.vy = 0;
+      player2.jumping = false;
+    }
 
     function resetBall() {
       ball.x = 400;
       ball.y = 300;
-      ball.vx = Math.random() < 0.5 ? 2.5 : -2.5;
-      ball.vy = -2;
+      ball.vx = 0;
+      ball.vy = -5;
       ball.heldBy = null;
       countdown = 180;
+    }
+
+    function resetGame() {
+      resetPlayers();
+      resetBall();
     }
 
     function updatePlayer(player, leftKey, rightKey, jumpKey, downKey, id) {
@@ -100,15 +132,25 @@
 
     function checkBallCollision(player) {
       if (ball.heldBy) return;
-      const dx = ball.x - (player.x + player.w / 2);
-      const dy = ball.y - (player.y + player.h / 2);
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const px = player.x;
+      const py = player.y;
+      const pw = player.w;
+      const ph = player.h;
 
-      if (distance < ball.radius + player.w / 2 && ball.hitCooldown <= 0) {
-        const angle = Math.atan2(dy, dx);
-        const speed = 5;
-        ball.vx = Math.cos(angle) * speed;
-        ball.vy = Math.sin(angle) * speed;
+      const closestX = Math.max(px, Math.min(ball.x, px + pw));
+      const closestY = Math.max(py, Math.min(ball.y, py + ph));
+      const dx = ball.x - closestX;
+      const dy = ball.y - closestY;
+
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < ball.radius && ball.hitCooldown <= 0) {
+        if (Math.abs(dy) > Math.abs(dx)) {
+          // vertical collision
+          ball.vy = -Math.abs(ball.vy || 2);
+        } else {
+          // horizontal collision
+          ball.vx = dx > 0 ? Math.abs(ball.vx || 2) : -Math.abs(ball.vx || 2);
+        }
         ball.hitCooldown = 10;
       }
     }
@@ -118,12 +160,12 @@
 
       if (ball.x - ball.radius <= 10 && ball.y > goalY) {
         score.player2++;
-        resetBall();
+        resetGame();
       }
 
       if (ball.x + ball.radius >= canvas.width - 10 && ball.y > goalY) {
         score.player1++;
-        resetBall();
+        resetGame();
       }
     }
 
@@ -160,6 +202,10 @@
 
       ball.vx *= FRICTION;
       ball.vy *= FRICTION;
+
+      // Stop if very slow
+      if (Math.abs(ball.vx) < BALL_STOP_THRESHOLD) ball.vx = 0;
+      if (Math.abs(ball.vy) < BALL_STOP_THRESHOLD) ball.vy = 0;
 
       if (ball.x - ball.radius < 0) {
         ball.x = ball.radius;
@@ -217,7 +263,7 @@
       img.onload = () => {
         loaded++;
         if (loaded === total) {
-          resetBall();
+          resetGame();
           loop();
         }
       };
