@@ -1,0 +1,88 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Don Soccer</title>
+  <style>
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 2px solid #333;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const images = {
+      background: new Image(),
+      player1: new Image(),
+      player2: new Image(),
+      ball: new Image()
+    };
+
+    images.background.src = "assets/background.png";
+    images.player1.src = "assets/player1.png";
+    images.player2.src = "assets/player2.png";
+    images.ball.src = "assets/ball.png";
+
+    let loaded = 0;
+    const total = Object.keys(images).length;
+    Object.values(images).forEach(img => {
+      img.onload = () => {
+        loaded++;
+        if (loaded === total) startGame();
+      };
+    });
+
+    const player1 = { x: 100, y: 300, w: 64, h: 64, name: "Big G", vx: 0 };
+    const player2 = { x: 600, y: 300, w: 64, h: 64, name: "Donny", vx: 0 };
+    const ball = { x: 400, y: 300, vx: 3, vy: -2, radius: 20 };
+
+    const keys = {};
+
+    window.addEventListener("keydown", e => keys[e.key] = true);
+    window.addEventListener("keyup", e => keys[e.key] = false);
+
+    function draw() {
+      ctx.drawImage(images.background, 0, 0, canvas.width, canvas.height);
+
+      ctx.font = "16px Arial";
+      ctx.fillStyle = "#000";
+      ctx.textAlign = "center";
+      ctx.fillText(player1.name, player1.x + player1.w / 2, player1.y - 10);
+      ctx.fillText(player2.name, player2.x + player2.w / 2, player2.y - 10);
+
+      ctx.drawImage(images.player1, player1.x, player1.y, player1.w, player1.h);
+      ctx.drawImage(images.player2, player2.x, player2.y, player2.w, player2.h);
+      ctx.drawImage(images.ball, ball.x - ball.radius, ball.y - ball.radius, 40, 40);
+    }
+
+    function update() {
+      if (keys["a"]) player1.x -= 5;
+      if (keys["d"]) player1.x += 5;
+      if (keys["ArrowLeft"]) player2.x -= 5;
+      if (keys["ArrowRight"]) player2.x += 5;
+
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+      if (ball.y <= 0 || ball.y >= canvas.height) ball.vy *= -1;
+      if (ball.x <= 0 || ball.x >= canvas.width) ball.vx *= -1;
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function startGame() {
+      loop();
+    }
+  </script>
+</body>
+</html>
