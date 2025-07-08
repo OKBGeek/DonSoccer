@@ -1,4 +1,351 @@
 
-<!-- Full updated HTML content with all features will go here -->
-<!-- Includes: goal-top bounce, solid player collisions, confirmation prompts, play again button -->
-<!-- The actual JavaScript game logic would be embedded here as part of a full game HTML file -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Don Soccer</title>
+  <style>
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 2px solid #333;
+    }
+    #controls {
+      text-align: center;
+      margin-top: 10px;
+    }
+    button {
+      padding: 8px 16px;
+      margin: 4px;
+      font-size: 16px;
+    }
+    #playAgainBtn {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <div id="controls">
+    <button onclick="confirmStart(60)">1 Minute</button>
+    <button onclick="confirmStart(120)">2 Minutes</button>
+    <button onclick="confirmStart(180)">3 Minutes</button>
+    <button onclick="confirmReset()">Restart Game</button>
+    <button id="playAgainBtn" onclick="playAgain()">Play Again</button>
+  </div>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const images = {
+      background: new Image(),
+      player1: new Image(),
+      player2: new Image(),
+      ball: new Image(),
+      goalLeft: new Image(),
+      goalRight: new Image()
+    };
+
+    images.background.src = "assets/background.png";
+    images.player1.src = "assets/player1.png";
+    images.player2.src = "assets/player2.png";
+    images.ball.src = "assets/ball.png";
+    images.goalLeft.src = "assets/goal-left.png";
+    images.goalRight.src = "assets/goal-right.png";
+
+    const GRAVITY = 0.3;
+    const FLOOR_Y = 336;
+    const FRICTION = 0.985;
+    const BOUNCE_REDUCTION = 0.85;
+    const BALL_STOP_THRESHOLD = 0.15;
+
+    const player1 = { x: 100, y: FLOOR_Y, w: 64, h: 64, name: "Big G", vy: 0, jumping: false };
+    const player2 = { x: 600, y: FLOOR_Y, w: 64, h: 64, name: "Donny", vy: 0, jumping: false };
+    const ball = { x: 400, y: 300, vx: 0, vy: -9, radius: 20, heldBy: null };
+
+    let score = { player1: 0, player2: 0 };
+    let countdown = 0;
+    let countdownText = "";
+    let matchTime = 0;
+    let matchRunning = false;
+    let winnerText = "";
+    let pendingAction = null;
+
+    const keys = {};
+    window.addEventListener("keydown", e => keys[e.key] = true);
+    window.addEventListener("keyup", e => {
+      keys[e.key] = false;
+      if (ball.heldBy && (e.key === "s" || e.key === "ArrowDown")) {
+        ball.heldBy = null;
+        ball.vx = 0;
+        ball.vy = -9;
+      }
+    });
+
+    function confirmStart(seconds) {
+      if (matchRunning) {
+        if (confirm("A match is in progress. Are you sure you want to start a new one?")) {
+          startMatch(seconds);
+        }
+      } else {
+        startMatch(seconds);
+      }
+    }
+
+    function confirmReset() {
+      if (matchRunning) {
+        if (confirm("Are you sure you want to reset the game?")) {
+          resetGame();
+          score.player1 = 0;
+          score.player2 = 0;
+        }
+      } else {
+        resetGame();
+        score.player1 = 0;
+        score.player2 = 0;
+      }
+    }
+
+    function playAgain() {
+      document.getElementById("playAgainBtn").style.display = "none";
+      startMatch(matchTime / 60);
+    }
+
+    function startMatch(seconds) {
+      matchTime = seconds * 60;
+      score.player1 = 0;
+      score.player2 = 0;
+      winnerText = "";
+      resetGame();
+      matchRunning = true;
+    }
+
+    function resetPlayers() {
+      player1.x = 100;
+      player1.y = FLOOR_Y;
+      player1.vy = 0;
+      player1.jumping = false;
+
+      player2.x = 600;
+      player2.y = FLOOR_Y;
+      player2.vy = 0;
+      player2.jumping = false;
+    }
+
+    function resetBall() {
+      ball.x = 400;
+      ball.y = 300;
+      ball.vx = 0;
+      ball.vy = -9;
+      ball.heldBy = null;
+      countdown = 180;
+    }
+
+    function resetGame() {
+      resetPlayers();
+      resetBall();
+      winnerText = "";
+      document.getElementById("playAgainBtn").style.display = "none";
+    }
+
+    function updatePlayer(player, leftKey, rightKey, jumpKey, downKey, id) {
+      if (keys[leftKey]) player.x -= 5;
+      if (keys[rightKey]) player.x += 5;
+      if (keys[jumpKey] && !player.jumping) {
+        player.vy = -10;
+        player.jumping = true;
+      }
+
+      player.y += player.vy;
+      player.vy += GRAVITY;
+
+      if (player.y >= FLOOR_Y) {
+        player.y = FLOOR_Y;
+        player.vy = 0;
+        player.jumping = false;
+      }
+
+      if (player.x < 0) player.x = 0;
+      if (player.x + player.w > canvas.width) player.x = canvas.width - player.w;
+
+      if (keys[downKey] && !ball.heldBy) {
+        const dx = ball.x - (player.x + player.w / 2);
+        const dy = ball.y - (player.y + player.h / 2);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < ball.radius + player.w / 2) {
+          ball.heldBy = id;
+        }
+      }
+    }
+
+    function checkBallCollision(player) {
+      if (ball.heldBy) return;
+
+      const px = player.x;
+      const py = player.y;
+      const pw = player.w;
+      const ph = player.h;
+
+      const closestX = Math.max(px, Math.min(ball.x, px + pw));
+      const closestY = Math.max(py, Math.min(ball.y, py + ph));
+      const dx = ball.x - closestX;
+      const dy = ball.y - closestY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < ball.radius) {
+        const angle = Math.atan2(dy, dx);
+        ball.vx += Math.cos(angle) * 3;
+        ball.vy += Math.sin(angle) * 3;
+      }
+    }
+
+    function checkGoal() {
+      const goalTopY = canvas.height - 120;
+
+      if (ball.y + ball.radius < goalTopY) return;
+
+      if (ball.x - ball.radius <= 10 && ball.y > goalTopY) {
+        score.player2++;
+        resetGame();
+      }
+
+      if (ball.x + ball.radius >= canvas.width - 10 && ball.y > goalTopY) {
+        score.player1++;
+        resetGame();
+      }
+    }
+
+    function update() {
+      if (!matchRunning) return;
+
+      if (countdown > 0) {
+        countdown--;
+        if (countdown > 120) countdownText = "3";
+        else if (countdown > 60) countdownText = "2";
+        else if (countdown > 0) countdownText = "1";
+        else countdownText = "PLAY!";
+        return;
+      } else {
+        countdownText = "";
+      }
+
+      if (matchTime > 0) {
+        matchTime--;
+        if (matchTime === 0) {
+          matchRunning = false;
+          if (score.player1 > score.player2) {
+            winnerText = "Big G WINS!";
+          } else if (score.player2 > score.player1) {
+            winnerText = "Donny WINS!";
+          } else {
+            winnerText = "IT'S A DRAW!";
+          }
+          document.getElementById("playAgainBtn").style.display = "inline-block";
+        }
+      }
+
+      updatePlayer(player1, "a", "d", "w", "s", "player1");
+      updatePlayer(player2, "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "player2");
+
+      if (ball.heldBy === "player1") {
+        ball.x = player1.x + player1.w / 2;
+        ball.y = player1.y;
+        return;
+      } else if (ball.heldBy === "player2") {
+        ball.x = player2.x + player2.w / 2;
+        ball.y = player2.y;
+        return;
+      }
+
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+      ball.vy += GRAVITY;
+      ball.vx *= FRICTION;
+
+      if (ball.x - ball.radius < 0) {
+        ball.x = ball.radius;
+        ball.vx *= -1;
+      }
+      if (ball.x + ball.radius > canvas.width) {
+        ball.x = canvas.width - ball.radius;
+        ball.vx *= -1;
+      }
+
+      const topGoalY = canvas.height - 120;
+      if (ball.y + ball.radius >= canvas.height) {
+        ball.y = canvas.height - ball.radius;
+        if (Math.abs(ball.vy) > BALL_STOP_THRESHOLD) {
+          ball.vy *= -BOUNCE_REDUCTION;
+          ball.vx *= BOUNCE_REDUCTION;
+        } else {
+          ball.vy = 0;
+        }
+      }
+
+      if (Math.abs(ball.vx) < BALL_STOP_THRESHOLD) ball.vx = 0;
+      if (Math.abs(ball.vy) < BALL_STOP_THRESHOLD) ball.vy = 0;
+
+      if (ball.y <= 0) ball.vy *= -1;
+
+      checkBallCollision(player1);
+      checkBallCollision(player2);
+      checkGoal();
+    }
+
+    function draw() {
+      ctx.drawImage(images.background, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(images.goalLeft, 0, canvas.height - 120, 60, 120);
+      ctx.drawImage(images.goalRight, canvas.width - 60, canvas.height - 120, 60, 120);
+
+      ctx.drawImage(images.player1, player1.x, player1.y, player1.w, player1.h);
+      ctx.drawImage(images.player2, player2.x, player2.y, player2.w, player2.h);
+      ctx.drawImage(images.ball, ball.x - ball.radius, ball.y - ball.radius, 40, 40);
+
+      ctx.font = "16px Arial";
+      ctx.fillStyle = "#000";
+      ctx.textAlign = "center";
+      ctx.fillText(player1.name, player1.x + player1.w / 2, player1.y - 10);
+      ctx.fillText(player2.name, player2.x + player2.w / 2, player2.y - 10);
+
+      ctx.font = "24px Arial";
+      ctx.fillText(score.player1 + " : " + score.player2, canvas.width / 2, 30);
+
+      if (countdownText) {
+        ctx.font = "48px Arial";
+        ctx.fillStyle = "red";
+        ctx.fillText(countdownText, canvas.width / 2, canvas.height / 2);
+      }
+
+      if (matchTime > 0 && matchRunning) {
+        ctx.font = "20px Arial";
+        ctx.fillStyle = "black";
+        ctx.fillText("Time Left: " + Math.floor(matchTime / 60), canvas.width / 2, 60);
+      }
+
+      if (winnerText) {
+        ctx.font = "48px Arial";
+        ctx.fillStyle = "green";
+        ctx.fillText(winnerText, canvas.width / 2, canvas.height / 2 + 40);
+      }
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    let loaded = 0;
+    const total = Object.keys(images).length;
+    Object.values(images).forEach(img => {
+      img.onload = () => {
+        loaded++;
+        if (loaded === total) {
+          resetGame();
+          loop();
+        }
+      };
+    });
+  </script>
+</body>
+</html>
