@@ -49,15 +49,15 @@
     images.goalLeft.src = "assets/goal-left.png";
     images.goalRight.src = "assets/goal-right.png";
 
-    const GRAVITY = 0.425;
+    const GRAVITY = 0.3;  // lower gravity
     const FLOOR_Y = 336;
-    const FRICTION = 0.98;
-    const BOUNCE = 0.9;
+    const FRICTION = 0.985;
+    const BOUNCE_REDUCTION = 0.85;
     const BALL_STOP_THRESHOLD = 0.15;
 
     const player1 = { x: 100, y: FLOOR_Y, w: 64, h: 64, name: "Big G", vy: 0, jumping: false };
     const player2 = { x: 600, y: FLOOR_Y, w: 64, h: 64, name: "Donny", vy: 0, jumping: false };
-    const ball = { x: 400, y: 300, vx: 0, vy: -7, radius: 20, hitCooldown: 0, heldBy: null };
+    const ball = { x: 400, y: 300, vx: 0, vy: -9, radius: 20, heldBy: null };
 
     let score = { player1: 0, player2: 0 };
     let countdown = 0;
@@ -73,7 +73,7 @@
       if (ball.heldBy && (e.key === "s" || e.key === "ArrowDown")) {
         ball.heldBy = null;
         ball.vx = 0;
-        ball.vy = -7;
+        ball.vy = -9;
       }
     });
 
@@ -102,7 +102,7 @@
       ball.x = 400;
       ball.y = 300;
       ball.vx = 0;
-      ball.vy = -7;
+      ball.vy = -9;
       ball.heldBy = null;
       countdown = 180;
     }
@@ -156,14 +156,10 @@
       const dy = ball.y - closestY;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance < ball.radius && ball.hitCooldown <= 0) {
-        const overlap = ball.radius - distance + 1;
+      if (distance < ball.radius) {
         const angle = Math.atan2(dy, dx);
         ball.vx += Math.cos(angle) * 3;
         ball.vy += Math.sin(angle) * 3;
-        ball.x += Math.cos(angle) * overlap;
-        ball.y += Math.sin(angle) * overlap;
-        ball.hitCooldown = 10;
       }
     }
 
@@ -199,13 +195,8 @@
         matchTime--;
         if (matchTime === 0) {
           matchRunning = false;
-          if (score.player1 > score.player2) {
-            winnerText = "Big G WINS!";
-          } else if (score.player2 > score.player1) {
-            winnerText = "Donny WINS!";
-          } else {
-            winnerText = "IT'S A DRAW!";
-          }
+          winnerText = score.player1 > score.player2 ? "Big G WINS!" :
+                       score.player2 > score.player1 ? "Donny WINS!" : "IT'S A DRAW!";
         }
       }
 
@@ -222,17 +213,11 @@
         return;
       }
 
-      if (ball.hitCooldown > 0) ball.hitCooldown--;
-
       ball.x += ball.vx;
       ball.y += ball.vy;
       ball.vy += GRAVITY;
 
       ball.vx *= FRICTION;
-      ball.vy *= FRICTION;
-
-      if (Math.abs(ball.vx) < BALL_STOP_THRESHOLD) ball.vx = 0;
-      if (Math.abs(ball.vy) < BALL_STOP_THRESHOLD) ball.vy = 0;
 
       if (ball.x - ball.radius < 0) {
         ball.x = ball.radius;
@@ -242,10 +227,21 @@
         ball.x = canvas.width - ball.radius;
         ball.vx *= -1;
       }
+
       if (ball.y + ball.radius >= canvas.height) {
         ball.y = canvas.height - ball.radius;
-        ball.vy = 0;
+        if (Math.abs(ball.vy) > BALL_STOP_THRESHOLD) {
+          ball.vy *= -BOUNCE_REDUCTION;
+          ball.vx *= BOUNCE_REDUCTION;
+        } else {
+          ball.vy = 0;
+          ball.vx *= 0.95;
+        }
       }
+
+      if (Math.abs(ball.vx) < BALL_STOP_THRESHOLD) ball.vx = 0;
+      if (Math.abs(ball.vy) < BALL_STOP_THRESHOLD) ball.vy = 0;
+
       if (ball.y <= 0) ball.vy *= -1;
 
       checkBallCollision(player1);
