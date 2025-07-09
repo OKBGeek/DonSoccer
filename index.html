@@ -1,4 +1,49 @@
+
 <!DOCTYPE html>
-<!-- Full HTML game content was generated in previous step. -->
-<!-- Rewriting to file again to restore download link. -->
-<html><head><meta charset="UTF-8" /><title>Don Soccer</title></head><body>Game content restored. Please reload this version with actual code.</body></html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Don Soccer</title>
+  <style>
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 2px solid #333;
+    }
+    #controls {
+      text-align: center;
+      margin-top: 10px;
+    }
+    button {
+      padding: 8px 16px;
+      margin: 4px;
+      font-size: 16px;
+    }
+    #playAgainBtn {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <div id="controls">
+    <button onclick="confirmStart(60)">1 Minute</button>
+    <button onclick="confirmStart(120)">2 Minutes</button>
+    <button onclick="confirmStart(180)">3 Minutes</button>
+    <button onclick="confirmReset()">Restart Game</button>
+    <button id="playAgainBtn" onclick="playAgain()">Play Again</button>
+  </div>
+  <script>
+    // Game script logic goes here
+    // For this step we're verifying HTML base writes correctly again
+    // Next step will include full JS gameplay logic
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "lightblue";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "30px Arial";
+    ctx.fillStyle = "black";
+    ctx.fillText("Game loading...", canvas.width / 2 - 100, canvas.height / 2);
+  </script>
+</body>
+</html>
